@@ -10,9 +10,12 @@ JCE_FLAVORS=(standard unlimited)
 # Dockerfile.jdk.tpl
 # Dockerfile.jdk-dcevm.tpl
 
-JAVA_VERSIONS=(7-80-15 8-92-14 8-102-14 8-111-14 8-121-13-e9e7ea248e2c4826b92b3f075a80e441 8-131-11-d54c1d3a095b4ff2b6607d096fa80163 8-141-15-336fa29ff2bb4ef291e347e091f7f4a7 8-144-01-090f390dda5b47b9b721c7dfaa008135)
+JAVA_VERSIONS=(7-80-15 8-92-14 8-102-14 8-111-14 8-121-13-e9e7ea248e2c4826b92b3f075a80e441 8-131-11-d54c1d3a095b4ff2b6607d096fa80163 8-141-15-336fa29ff2bb4ef291e347e091f7f4a7 8-144-01-090f390dda5b47b9b721c7dfaa008135 8-151-12-e758a0de34e24606bca991d704f6dcbf 8-152-16-aa0333dd3019491ca4f6ddbe78cdb6d0 8-162-12-0da788060d494f5095bf8624735fa2f1)
 
-GLIBC_VERSION="2.23-r3"
+ALPINE_VERSION="3.7"
+GLIBC_VERSION="2.27-r0"
+GLIBC_REPO="https:\/\/github.com\/sgerrand\/alpine-pkg-glibc"
+HOTSWAP_AGENT_VERSION="1.2.0"
 
 gen_dockerfile() {
   JVM_PACKAGE="$1"
@@ -36,7 +39,9 @@ gen_dockerfile() {
     JVM_PACKAGE="jdk"
   fi
 
-  sed "s/%JVM_MAJOR%/${JVM_MAJOR}/g;
+  sed "s/%ALPINE_VERSION%/${ALPINE_VERSION}/g;
+       s/%HOTSWAP_AGENT_VERSION%/${HOTSWAP_AGENT_VERSION}/g;
+       s/%JVM_MAJOR%/${JVM_MAJOR}/g;
        s/%JVM_MINOR%/${JVM_MINOR}/g;
        s/%JVM_BUILD%/${JVM_BUILD}/g;
        s/%JVM_PACKAGE%/${JVM_PACKAGE}/g;
@@ -44,6 +49,7 @@ gen_dockerfile() {
        s/%JAVA_JCE%/${JAVA_JCE:-standard}/g;
        s/%DCEVM_INSTALLER_URL%/${DCEVM_INSTALLER_URL}/g;
        s/%DCEVM_INSTALLER_NAME%/${DCEVM_INSTALLER_NAME}/g;
+       s/%GLIBC_REPO%/${GLIBC_REPO}/g;
        s/%GLIBC_VERSION%/${GLIBC_VERSION}/g" \
     ${DOCKERFILE_TEMPLATE} > ${DOCKERFILE_TARGET} && \
   echo "done" || \

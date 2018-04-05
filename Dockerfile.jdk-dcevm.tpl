@@ -1,5 +1,6 @@
-# AlpineLinux with a glibc-2.23 and Oracle Java %JVM_MAJOR%
-FROM alpine:3.4
+# AlpineLinux with a glibc-%GLIBC_VERSION% and Oracle Java %JVM_MAJOR%
+FROM alpine:%ALPINE_VERSION%
+
 
 MAINTAINER Anastas Dancha <anapsix@random.io>
 # thanks to Vladimir Krivosheev <develar@gmail.com> aka @develar for smaller image
@@ -10,17 +11,20 @@ ENV JAVA_VERSION_MAJOR=%JVM_MAJOR% \
     JAVA_VERSION_MINOR=%JVM_MINOR% \
     JAVA_VERSION_BUILD=%JVM_BUILD% \
     JAVA_PACKAGE=%JVM_PACKAGE% \
+    HOTSWAP_AGENT_VERSION=%HOTSWAP_AGENT_VERSION% \
     JAVA_JCE=%JAVA_JCE% \
     JAVA_HOME=/opt/jdk \
     PATH=${PATH}:/opt/jdk/bin \
+    GLIBC_REPO=%GLIBC_REPO% \
     GLIBC_VERSION=%GLIBC_VERSION% \
     LANG=C.UTF-8
 
 # do all in one step
 RUN set -ex && \
-    apk upgrade --update && \
-    apk add --update libstdc++ curl ca-certificates bash && \
-    for pkg in glibc-${GLIBC_VERSION} glibc-bin-${GLIBC_VERSION} glibc-i18n-${GLIBC_VERSION}; do curl -sSL https://github.com/andyshinn/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/${pkg}.apk -o /tmp/${pkg}.apk; done && \
+    [[ ${JAVA_VERSION_MAJOR} != 7 ]] || ( echo >&2 'Oracle no longer publishes JAVA7 packages' && exit 1 ) && \
+    apk -U upgrade && \
+    apk add libstdc++ curl ca-certificates bash && \
+    for pkg in glibc-${GLIBC_VERSION} glibc-bin-${GLIBC_VERSION} glibc-i18n-${GLIBC_VERSION}; do curl -sSL ${GLIBC_REPO}/releases/download/${GLIBC_VERSION}/${pkg}.apk -o /tmp/${pkg}.apk; done && \
     apk add --allow-untrusted /tmp/*.apk && \
     rm -v /tmp/*.apk && \
     ( /usr/glibc-compat/bin/localedef --force --inputfile POSIX --charmap UTF-8 C.UTF-8 || true ) && \
@@ -31,6 +35,9 @@ RUN set -ex && \
     mkdir /opt && \
     curl -jksSLH "Cookie: oraclelicense=accept-securebackup-cookie" -o /tmp/java.tar.gz \
       %JVM_URL% && \
+    JAVA_PACKAGE_SHA256=$(curl -sSL https://www.oracle.com/webfolder/s/digest/${JAVA_VERSION_MAJOR}u${JAVA_VERSION_MINOR}checksum.html | grep -E "${JAVA_PACKAGE}-${JAVA_VERSION_MAJOR}u${JAVA_VERSION_MINOR}-linux-x64\.tar\.gz" | grep -Eo '(sha256: )[^<]+' | cut -d: -f2 | xargs) && \
+    echo "${JAVA_PACKAGE_SHA256}  /tmp/java.tar.gz" > /tmp/java.tar.gz.sha256 && \
+    sha256sum -c /tmp/java.tar.gz.sha256 && \
     gunzip /tmp/java.tar.gz && \
     tar -C /opt -xf /tmp/java.tar && \
     ln -s /opt/jdk1.${JAVA_VERSION_MAJOR}.0_${JAVA_VERSION_MINOR} /opt/jdk && \
@@ -38,6 +45,9 @@ RUN set -ex && \
     unzip %DCEVM_INSTALLER_NAME% && \
     mkdir -p /opt/jdk/jre/lib/amd64/dcevm && \
     cp linux_amd64_compiler2/product/libjvm.so /opt/jdk/jre/lib/amd64/dcevm/libjvm.so && \
+    mkdir -p /opt/hotswap-agent/ && \
+    curl -L -o /opt/hotswap-agent/hotswap-agent-${HOTSWAP_AGENT_VERSION}.jar "https://github.com/HotswapProjects/HotswapAgent/releases/download/RELEASE-${HOTSWAP_AGENT_VERSION}/hotswap-agent-${HOTSWAP_AGENT_VERSION}.jar" && \
+    ln -s /opt/hotswap-agent/hotswap-agent-${HOTSWAP_AGENT_VERSION}.jar /opt/hotswap-agent/hotswap-agent.jar && \
     if [ "${JAVA_JCE}" == "unlimited" ]; then echo "Installing Unlimited JCE policy" && \
       curl -jksSLH "Cookie: oraclelicense=accept-securebackup-cookie" -o /tmp/jce_policy-${JAVA_VERSION_MAJOR}.zip \
         http://download.oracle.com/otn-pub/java/jce/${JAVA_VERSION_MAJOR}/jce_policy-${JAVA_VERSION_MAJOR}.zip && \
